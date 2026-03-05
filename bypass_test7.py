@@ -1,0 +1,57 @@
+import os
+from dotenv import load_dotenv
+from playwright.sync_api import sync_playwright
+import time
+
+load_dotenv()
+
+def test():
+    with sync_playwright() as p:
+        # Launch non-headless to pass CAPTCHA
+        browser = p.chromium.launch(args=["--disable-blink-features=AutomationControlled"], headless=False)
+        iphone = p.devices['iPhone 13'].copy()
+        iphone.pop('default_browser_type', None)
+        context = browser.new_context(**iphone)
+        page = context.new_page()
+
+        page.goto("https://www.amazon.com/gp/css/order-history?ref_=nav_AccountFlyout_orders", wait_until="domcontentloaded")
+        
+        email = os.getenv("AMAZON_EMAIL")
+        password = os.getenv("AMAZON_PASSWORD")
+        
+        email_input = page.locator("input[type='email'], input[name='email'], input[type='text']").locator("visible=true").first
+        email_input.wait_for(state="visible", timeout=60000)
+        time.sleep(1)
+        email_input.fill(email)
+        
+        continue_btn = page.locator("input#continue, input[type='submit']").locator("visible=true").first
+        continue_btn.click()
+        time.sleep(2)
+        
+        password_input = page.locator("input[type='password'], input[name='password']").locator("visible=true").first
+        password_input.wait_for(state="visible", timeout=60000)
+        password_input.fill(password)
+        
+        submit_btn = page.locator("input#signInSubmit, input[type='submit']").locator("visible=true").first
+        submit_btn.click()
+        
+        print("Waiting up to 60 seconds for login to succeed or for you to pass the CAPTCHA manually...")
+        for i in range(30):
+            page.wait_for_timeout(2000)
+            if "order-history" in page.url.lower():
+                print("Successfully logged in!")
+                import json
+                
+                # Mock a single transaction to test output
+                txn = [{
+                  "id": "123",
+                  "order_status": "COMPLETED"
+                }]
+                with open("transactions.json", "w") as f:
+                    json.dump(txn, f)
+                break
+        
+        browser.close()
+
+if __name__ == "__main__":
+    test()

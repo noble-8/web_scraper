@@ -39,26 +39,37 @@ def login_to_amazon(page, email, password):
         else:
             print("Logging in...")
             # Email step
-            page.wait_for_selector("input[type='email']", state="visible", timeout=60000)
-            page.fill("input[type='email']", email)
-            page.click("input#continue")
+            email_input = page.locator("input[type='email'], input[name='email'], input[type='text']").locator("visible=true").first
+            email_input.wait_for(state="visible", timeout=60000)
+            email_input.fill(email)
+            
+            continue_btn = page.locator("input#continue, input[type='submit']").locator("visible=true").first
+            continue_btn.click()
             
             # Password step
-            page.wait_for_selector("input[type='password']", state="visible", timeout=60000)
-            page.fill("input[type='password']", password)
-            page.click("input#signInSubmit")
+            password_input = page.locator("input[type='password'], input[name='password']").locator("visible=true").first
+            password_input.wait_for(state="visible", timeout=60000)
+            password_input.fill(password)
+            
+            submit_btn = page.locator("input#signInSubmit, input[type='submit']").locator("visible=true").first
+            submit_btn.click()
         
         # Wait for navigation. If a captcha or OTP is triggered, the URL won't change to order history
         try:
-            page.wait_for_url("**/order-history*", timeout=15000)
+            page.wait_for_url("**/your-orders/orders*", timeout=15000)
             print("Successfully logged in.")
         except Exception as e:
+            # Maybe it went to the old order-history, let's check current URL
+            if "order-history" in page.url.lower() or "your-orders" in page.url.lower():
+                print("Successfully logged in.")
+                return
+            
             print("Login took too long or encountered anti-bot measures (CAPTCHA/OTP).")
             print("Current URL:", page.url)
-            print("If you ran with --headful, you can manually solve it.")
+            print("If you ran with --headful, you can manually solve it. Waiting up to 120 seconds...")
             # Give the user a chance to manually solve it if they are running headful
-            for _ in range(60):
-                if "order-history" in page.url.lower():
+            for _ in range(120):
+                if "order-history" in page.url.lower() or "your-orders" in page.url.lower():
                     print("Successfully bypassed or solved login challenge.")
                     break
                 time.sleep(1)
