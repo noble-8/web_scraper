@@ -66,15 +66,33 @@ def login_to_amazon(page, email, password):
             
             print("Login took too long or encountered anti-bot measures (CAPTCHA/OTP).")
             print("Current URL:", page.url)
-            print("If you ran with --headful, you can manually solve it. Waiting up to 120 seconds...")
+            print("If you ran with --headful, you can manually solve it. Waiting up to 60 seconds...")
             # Give the user a chance to manually solve it if they are running headful
-            for _ in range(120):
-                if "order-history" in page.url.lower() or "your-orders" in page.url.lower():
+            for i in range(60):
+                current_url = page.url.lower()
+                if "order-history" in current_url or "your-orders" in current_url:
                     print("Successfully bypassed or solved login challenge.")
                     break
+                    
+                # If they are out of the auth flow (ap/...), they might be on the homepage
+                if "/ap/" not in urllib.parse.urlparse(current_url).path.lower() and "signin" not in urllib.parse.urlparse(current_url).path.lower():
+                    print("Successfully bypassed or solved login challenge (navigated out of auth).")
+                    # Navigate back to order history just in case they ended up elsewhere
+                    page.goto("https://www.amazon.com/gp/css/order-history?ref_=nav_AccountFlyout_orders")
+                    break
+                    
+                # Sometimes URL doesn't change but DOM indicates we are on main page 
+                if page.locator("#nav-logo, #nav-main, .nav-belt").count() > 0:
+                    print("Successfully bypassed login challenge (detected main page navigation).")
+                    page.goto("https://www.amazon.com/gp/css/order-history?ref_=nav_AccountFlyout_orders")
+                    break
+
+                if i % 10 == 0:
+                    print(f"Still waiting... Current URL: {current_url}")
+                    
                 time.sleep(1)
             else:
-                raise Exception("Failed to bypass login anti-bot protections.") from e
+                raise Exception("Failed to bypass login anti-bot protections within 60 seconds.") from e
 
 def extract_transaction_details(page, order_card_url):
     """
